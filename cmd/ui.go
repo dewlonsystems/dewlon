@@ -76,7 +76,7 @@ func isTerminal(f *os.File) bool {
 // Commands that go straight to a prompt (like `new`) should not print it.
 // It is skipped with --quiet or when stdout is piped, so scripts and CI
 // logs stay clean. Only box-drawing and ASCII characters are used, all
-// single-width, so alignment holds in any terminal.
+// single-width, so alignment holds in any terminal..
 func printLogo() {
 	if quiet || !stdoutIsTerminal() {
 		return
