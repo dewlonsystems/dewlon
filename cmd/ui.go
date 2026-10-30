@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dewlonsystems/dewlon/internal/buildinfo"
 	"github.com/fatih/color"
 )
 
@@ -48,26 +49,64 @@ func fail(err error) {
 // isInteractive reports whether stdin is a real terminal, so we know if
 // it makes sense to ask the user questions.
 func isInteractive() bool {
-	fi, err := os.Stdin.Stat()
+	return isTerminal(os.Stdin)
+}
+
+// stdoutIsTerminal reports whether stdout is a real terminal.
+func stdoutIsTerminal() bool {
+	return isTerminal(os.Stdout)
+}
+
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
 	if err != nil {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// printLogo prints the Dewlon "D" mark with a red accent. Purely cosmetic;
-// fatih/color falls back to plain text on terminals without color.
+// printLogo prints the Dewlon mark: a small terminal window holding a
+// prompt, with the name and maker beside it.
+//
+//	┌──────┐
+//	│  >_  │  dewlon v0.3.0
+//	└──────┘  by Dewlon Systems
+//
+// Use it sparingly: bare `dewlon`, `dewlon init` and `--version` only.
+// Commands that go straight to a prompt (like `new`) should not print it.
+// It is skipped with --quiet or when stdout is piped, so scripts and CI
+// logs stay clean. Only box-drawing and ASCII characters are used, all
+// single-width, so alignment holds in any terminal.
 func printLogo() {
+	if quiet || !stdoutIsTerminal() {
+		return
+	}
+
+	info := buildinfo.Get()
+
+	frame := color.New(color.FgCyan).SprintFunc()
+	prompt := color.New(color.FgCyan, color.Bold).SprintFunc()
+	cursor := color.New(color.FgHiWhite, color.Bold).SprintFunc()
+	name := color.New(color.Bold).SprintFunc()
+	dim := color.New(color.Faint).SprintFunc()
+
+	fmt.Println()
+	fmt.Println("  " + frame("┌──────┐"))
+	fmt.Println("  " + frame("│") + "  " + prompt(">") + cursor("_") + "  " + frame("│") + "  " + name("dewlon cli") + " " + dim(info.Version))
+	fmt.Println("  " + frame("└──────┘") + "  " + dim("by Dewlon Systems"))
+	fmt.Println()
+}
+
+// printLogoCompact prints a one-line mark for --version, error screens
+// and narrow terminals.
+func printLogoCompact() {
 	if quiet {
 		return
 	}
-	red := color.New(color.FgRed).SprintFunc()
-
-	fmt.Println(" ██████╗  " + red("███████╗"))
-	fmt.Println(" ██╔══██╗ " + red("██╔════╝"))
-	fmt.Println(" ██║  ██║ " + red("█████╗  "))
-	fmt.Println(" ██║  ██║ " + red("██╔══╝  "))
-	fmt.Println(" ██████╔╝ " + red("███████╗"))
-	fmt.Println(" ╚═════╝  " + red("╚══════╝"))
-	fmt.Println()
+	info := buildinfo.Get()
+	fmt.Printf("%s %s %s\n",
+		color.New(color.FgCyan, color.Bold).Sprint(">_"),
+		color.New(color.Bold).Sprint("dewlon"),
+		color.New(color.Faint).Sprint(info.Version),
+	)
 }
