@@ -16,6 +16,7 @@ import (
 	"github.com/dewlonsystems/dewlon/internal/filesystem"
 	"github.com/dewlonsystems/dewlon/internal/placeholder"
 	"github.com/dewlonsystems/dewlon/internal/runner"
+	"github.com/dewlonsystems/dewlon/internal/source"
 	"github.com/dewlonsystems/dewlon/internal/templates"
 	"github.com/dewlonsystems/dewlon/internal/unzip"
 )
@@ -33,6 +34,10 @@ type Options struct {
 	// Ref is the branch, tag or commit to build from. Defaults to the
 	// template's own default.
 	Ref string
+	// SHA256 pins the checksum the downloaded template must have.
+	SHA256 string
+	// SkipVerify turns off checksum verification for tagged releases.
+	SkipVerify bool
 	// SkipInstall leaves dependencies alone, for offline use or CI.
 	SkipInstall bool
 
@@ -48,6 +53,8 @@ type Result struct {
 	Path     string
 	Template templates.Template
 	Ref      string
+	// Verified is true when the download was checked against a checksum.
+	Verified bool
 	// Warnings are problems that didn't stop the project from being
 	// created, such as dependencies that couldn't be installed.
 	Warnings []string
@@ -115,6 +122,17 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 		return nil, fmt.Errorf("checking %q: %w", target, statErr)
 	}
 
+	// Work out where the template comes from (and what checksum to expect)
+	// before touching the disk, so a bad --ref or --sha256 fails fast.
+	plan, err := source.Resolve(ctx, tpl, source.Options{
+		Ref:        ref,
+		SHA256:     opts.SHA256,
+		SkipVerify: opts.SkipVerify,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	// The download lives in the system temp folder so it never clutters the
 	// user's directory.
 	zipFile, err := os.CreateTemp("", "dewlon-*.zip")
@@ -143,8 +161,17 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 	}()
 
 	logf("Downloading %s (%s)", tpl.Name, ref)
-	if err = downloader.Download(ctx, tpl.ArchiveURL(ref), zipPath); err != nil {
+	sum, err := downloader.Download(ctx, plan.Request, zipPath)
+	if err != nil {
 		return nil, fmt.Errorf("downloading template: %w", err)
+	}
+	if err = source.Verify(plan, sum); err != nil {
+		return nil, err
+	}
+	if plan.Checked() {
+		logf("Checksum verified (sha256:%s)", sum[:12])
+	} else {
+		logf("Checksum not verified (%s is a moving reference; use a release tag or --sha256 to pin it)", ref)
 	}
 
 	logf("Unpacking")
@@ -188,7 +215,8 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 
 		runErr := runner.Run(ctx, target, opts.InstallOutput, tpl.Install[0], tpl.Install[1:]...)
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			err = ctx.Err()
+			return nil, err
 		}
 		if runErr != nil {
 			var missing *runner.MissingToolError
@@ -208,7 +236,13 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 		abs = target
 	}
 
-	return &Result{Path: abs, Template: tpl, Ref: ref, Warnings: warnings}, nil
+	return &Result{
+		Path:     abs,
+		Template: tpl,
+		Ref:      ref,
+		Verified: plan.Checked(),
+		Warnings: warnings,
+	}, nil
 }
 
 // packageName turns "my-app" into "my_app", which is what Dart (and other

@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -23,6 +22,8 @@ var (
 	targetDir    string
 	modulePath   string
 	gitRef       string
+	pinnedSHA    string
+	noVerify     bool
 	skipInstall  bool
 )
 
@@ -86,6 +87,13 @@ var newCmd = &cobra.Command{
 If project-name is left out and you're in a terminal, you'll be asked for
 the name and the template. In scripts and CI, pass the name as an argument.
 
+Release tags are verified: with --ref v1.2.0, the template is checked
+against the checksum its maintainers published. Branches can't be verified
+that way; pin one with --sha256 if you need to.
+
+Private template repositories work too. Set DEWLON_GITHUB_TOKEN (or
+GITHUB_TOKEN) to a token that can read them.
+
 Examples:
 
   dewlon new hospital-api
@@ -143,6 +151,8 @@ func runNew(cmd *cobra.Command, args []string) error {
 		Dir:         targetDir,
 		Module:      modulePath,
 		Ref:         gitRef,
+		SHA256:      pinnedSHA,
+		SkipVerify:  noVerify,
 		SkipInstall: skipInstall,
 	}
 	if verbose && !quiet {
@@ -160,6 +170,9 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	say("")
 	success("Created %s in %s", name, time.Since(start).Round(100*time.Millisecond))
+	if res.Verified {
+		success("Template checksum verified")
+	}
 
 	for _, w := range res.Warnings {
 		warn("%s", w)
@@ -194,6 +207,8 @@ func init() {
 	flags.StringVarP(&targetDir, "dir", "d", "", "folder to create the project in (default: current folder)")
 	flags.StringVarP(&modulePath, "module", "m", "", "Go module path (default: github.com/dewlonsystems/<name>)")
 	flags.StringVar(&gitRef, "ref", "", "template branch, tag or commit to build from (default: the template's main branch)")
+	flags.StringVar(&pinnedSHA, "sha256", "", "require the downloaded template to have this SHA-256 checksum")
+	flags.BoolVar(&noVerify, "no-verify", false, "skip checksum verification for tagged releases")
 	flags.BoolVar(&skipInstall, "no-install", false, "don't install dependencies after creating the project")
 
 	// Tab-complete template names in the shell, with their descriptions.
@@ -210,6 +225,3 @@ func init() {
 			return nil, cobra.ShellCompDirectiveFilterDirs
 		})
 }
-
-// Compile-time check that the verbose installer stream is a plain writer.
-var _ io.Writer = os.Stdout

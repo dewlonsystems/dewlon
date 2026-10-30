@@ -1,0 +1,51 @@
+// Package database sets up the PostgreSQL connection pool the rest of the
+// app shares.
+package database
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// EnvURL is the environment variable holding the connection string.
+const EnvURL = "DATABASE_URL"
+
+// Connect opens a pool using the connection string in DATABASE_URL.
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
+	url := os.Getenv(EnvURL)
+	if url == "" {
+		return nil, fmt.Errorf("%s is not set", EnvURL)
+	}
+	return ConnectURL(ctx, url)
+}
+
+// ConnectURL opens a pool for url and checks that the database answers
+// before handing it back, so a bad address fails at startup rather than on
+// the first request.
+func ConnectURL(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("parsing database url: %w", err)
+	}
+
+	cfg.MaxConns = 10
+	cfg.MaxConnLifetime = time.Hour
+	cfg.HealthCheckPeriod = time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating pool: %w", err)
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := pool.Ping(pingCtx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("reaching the database: %w", err)
+	}
+	return pool, nil
+}

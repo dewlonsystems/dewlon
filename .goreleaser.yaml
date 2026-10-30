@@ -1,0 +1,82 @@
+version: 2
+
+project_name: dewlon
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: dewlon
+    main: .
+    binary: dewlon
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/dewlonsystems/dewlon/internal/buildinfo.Version={{ .Tag }}
+      - -X github.com/dewlonsystems/dewlon/internal/buildinfo.Commit={{ .ShortCommit }}
+      - -X github.com/dewlonsystems/dewlon/internal/buildinfo.Date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "dewlon_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+      - README*
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+
+release:
+  prerelease: auto
+
+# macOS and Linuxbrew users: brew install dewlonsystems/tap/dewlon
+# The binary isn't notarized yet, so the hook clears the quarantine flag
+# macOS puts on downloads. Otherwise Gatekeeper blocks the first run.
+homebrew_casks:
+  - name: dewlon
+    repository:
+      owner: dewlonsystems
+      name: homebrew-tap
+      token: "{{ .Env.PACKAGES_GITHUB_TOKEN }}"
+    homepage: https://github.com/dewlonsystems/dewlon
+    description: Scaffold new projects from Dewlon's maintained templates
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/dewlon"]
+          end
+
+# Windows users: scoop bucket add dewlon https://github.com/dewlonsystems/scoop-bucket
+#                scoop install dewlon
+scoops:
+  - repository:
+      owner: dewlonsystems
+      name: scoop-bucket
+      token: "{{ .Env.PACKAGES_GITHUB_TOKEN }}"
+    homepage: https://github.com/dewlonsystems/dewlon
+    description: Scaffold new projects from Dewlon's maintained templates
