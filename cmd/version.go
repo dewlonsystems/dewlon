@@ -6,22 +6,33 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/dewlonsystems/dewlon/internal/buildinfo"
 	"github.com/spf13/cobra"
 )
 
-// Version is the dewlon CLI version. Update this per release, or inject a
-// value at build time via -ldflags "-X github.com/dewlonsystems/dewlon/cmd.Version=v0.2.0"
-// so a tagged release always reports the tag it was built from.
-var Version = "dev"
+var shortVersion bool
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the dewlon version",
+	Short: "Print version and build details",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("dewlon version", Version)
+		info := buildinfo.Get()
+
+		if shortVersion {
+			fmt.Println(info.Version)
+			return
+		}
+
+		fmt.Printf("dewlon %s\n", info.Version)
+		fmt.Printf("  commit:   %s\n", info.Commit)
+		fmt.Printf("  built:    %s\n", info.Date)
+		fmt.Printf("  go:       %s\n", info.GoVersion)
+		fmt.Printf("  platform: %s\n", info.Platform)
 	},
 }
 
 func init() {
+	versionCmd.Flags().BoolVar(&shortVersion, "short", false, "print only the version number")
 	rootCmd.AddCommand(versionCmd)
 }
