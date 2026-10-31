@@ -31,7 +31,8 @@ func Extract(ctx context.Context, zipFile, dest string, limits Limits) error {
 	if err != nil {
 		return fmt.Errorf("opening archive: %w", err)
 	}
-	defer reader.Close()
+	// The archive is only read, so a failed close loses nothing.
+	defer func() { _ = reader.Close() }()
 
 	if len(reader.File) > limits.MaxFiles {
 		return fmt.Errorf("archive has %d entries, over the limit of %d", len(reader.File), limits.MaxFiles)
@@ -94,7 +95,7 @@ func extractFile(f *zip.File, target string, budget int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// Keep the original permissions (so shell scripts stay executable),
 	// but never let a file end up unreadable to its owner.

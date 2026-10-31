@@ -52,9 +52,10 @@ changelog:
 release:
   prerelease: auto
 
-# macOS and Linuxbrew users: brew install dewlonsystems/tap/dewlon
-# The binary isn't notarized yet, so the hook clears the quarantine flag
-# macOS puts on downloads. Otherwise Gatekeeper blocks the first run.
+# macOS: brew install dewlonsystems/tap/dewlon
+# The binary isn't notarized yet, so the post-install step clears the
+# quarantine flag macOS puts on downloads. Without it, Gatekeeper blocks
+# the first run.
 homebrew_casks:
   - name: dewlon
     repository:
@@ -65,14 +66,11 @@ homebrew_casks:
     description: Scaffold new projects from Dewlon's maintained templates
     hooks:
       post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr",
-                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/dewlon"]
-          end
+        install_steps: |
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/dewlon"]
 
-# Windows users: scoop bucket add dewlon https://github.com/dewlonsystems/scoop-bucket
-#                scoop install dewlon
+# Windows: scoop bucket add dewlon https://github.com/dewlonsystems/scoop-bucket
+#          scoop install dewlon
 scoops:
   - repository:
       owner: dewlonsystems

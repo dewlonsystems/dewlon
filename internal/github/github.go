@@ -140,7 +140,7 @@ func GetBytes(ctx context.Context, rawURL, accept string, limit int64) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, &APIError{Status: resp.StatusCode, URL: rawURL, HadToken: token != ""}

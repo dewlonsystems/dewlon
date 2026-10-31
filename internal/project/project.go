@@ -141,7 +141,7 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 	}
 	zipPath := zipFile.Name()
 	_ = zipFile.Close()
-	defer os.Remove(zipPath)
+	defer func() { _ = os.Remove(zipPath) }()
 
 	staging, err := os.MkdirTemp(parent, ".dewlon-"+projectName+"-")
 	if err != nil {
@@ -149,7 +149,7 @@ func Create(ctx context.Context, projectName, templateKey string, opts Options) 
 	}
 	// After a successful rename this path no longer exists, so removing it
 	// is a harmless no-op on the happy path.
-	defer os.RemoveAll(staging)
+	defer func() { _ = os.RemoveAll(staging) }()
 
 	// If anything fails or is cancelled after the project is in place,
 	// take it away again so the user is left with a clean slate.

@@ -112,7 +112,9 @@ func fetch(ctx context.Context, r Request, dest string) (sum string, err error) 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	// Nothing useful can be done about a failed close on a response body
+	// we've already read.
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", &statusError{code: resp.StatusCode, status: resp.Status, url: r.URL, hadToken: r.Token != ""}
@@ -125,8 +127,8 @@ func fetch(ctx context.Context, r Request, dest string) (sum string, err error) 
 	if err != nil {
 		return "", err
 	}
-	// Don't leave a partial file behind, and don't ignore a failed close:
-	// on some filesystems that's where a write error finally shows up.
+	// Don't leave a partial file behind, and don't ignore a failed close
+	// here: on some filesystems that's where a write error finally shows up.
 	defer func() {
 		if cerr := file.Close(); err == nil {
 			err = cerr

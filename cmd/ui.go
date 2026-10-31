@@ -96,17 +96,3 @@ func printLogo() {
 	fmt.Println("  " + frame("└──────┘") + "  " + dim("by Dewlon Systems"))
 	fmt.Println()
 }
-
-// printLogoCompact prints a one-line mark for --version, error screens
-// and narrow terminals.
-func printLogoCompact() {
-	if quiet {
-		return
-	}
-	info := buildinfo.Get()
-	fmt.Printf("%s %s %s\n",
-		color.New(color.FgCyan, color.Bold).Sprint(">_"),
-		color.New(color.Bold).Sprint("dewlon"),
-		color.New(color.Faint).Sprint(info.Version),
-	)
-}

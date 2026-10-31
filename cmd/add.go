@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"text/tabwriter"
 
 	"github.com/dewlonsystems/dewlon/internal/modules"
 	"github.com/dewlonsystems/dewlon/internal/runner"
@@ -113,16 +112,15 @@ func runAdd(cmd *cobra.Command, args []string) error {
 // installRequires fetches the module's Go dependencies. The files are
 // already in place by now, so a failure here is a warning, not an error.
 func installRequires(cmd *cobra.Command, proj modules.Project, mod modules.Module) {
-	var stream *os.File
-	if verbose && !quiet {
-		stream = os.Stdout
-	}
+	streaming := verbose && !quiet
 
+	// A nil *os.File stored in an io.Writer is not a nil interface, so the
+	// two cases are spelled out instead of passing a maybe-nil file through.
 	run := func(args ...string) error {
-		if stream == nil {
-			return runner.Run(cmd.Context(), proj.Dir, nil, "go", args...)
+		if streaming {
+			return runner.Run(cmd.Context(), proj.Dir, os.Stdout, "go", args...)
 		}
-		return runner.Run(cmd.Context(), proj.Dir, stream, "go", args...)
+		return runner.Run(cmd.Context(), proj.Dir, nil, "go", args...)
 	}
 
 	say("")
@@ -149,12 +147,11 @@ func warnInstall(err error, manual string) {
 }
 
 func listModules() error {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "MODULE\tDESCRIPTION")
+	var rows [][]string
 	for _, m := range modules.All() {
-		fmt.Fprintf(w, "%s\t%s\n", m.Key, m.Description)
+		rows = append(rows, []string{m.Key, m.Description})
 	}
-	if err := w.Flush(); err != nil {
+	if err := printTable([]string{"MODULE", "DESCRIPTION"}, rows); err != nil {
 		return err
 	}
 	say("")

@@ -78,7 +78,10 @@ func executablePath() string {
 // upgradeHint guesses how dewlon was installed from where the binary sits
 // and returns the matching upgrade command.
 func upgradeHint(exe, goos string) string {
-	p := strings.ToLower(filepath.ToSlash(exe))
+	// Swap backslashes by hand rather than using filepath.ToSlash, which
+	// only does that when running on Windows. This way a Windows path is
+	// recognised no matter which OS the check runs on.
+	p := strings.ToLower(strings.ReplaceAll(exe, `\`, "/"))
 
 	switch {
 	case strings.Contains(p, "/cellar/"), strings.Contains(p, "/caskroom/"), strings.Contains(p, "/homebrew/"):
