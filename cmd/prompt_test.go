@@ -43,7 +43,10 @@ func TestReadLineTreatsEmptyEOFAsCancel(t *testing.T) {
 func TestReadLineStopsWhenContextIsCancelled(t *testing.T) {
 	// A pipe nobody writes to: the read would block forever.
 	pr, pw := io.Pipe()
-	defer pw.Close()
+
+	// Closing the write end also lets the background read finish, so the
+	// goroutine doesn't outlive the test.
+	defer func() { _ = pw.Close() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
