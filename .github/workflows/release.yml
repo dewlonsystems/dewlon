@@ -1,21 +1,43 @@
 name: Release
 
-# Pushing a tag like v0.2.0 builds the binaries and publishes the release,
-# the Homebrew cask and the Scoop manifest.
+# Every push to main updates the "release PR". Merging that PR creates the
+# tag and GitHub release, and the second job then builds and publishes the
+# binaries, the Homebrew cask and the Scoop manifest.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to rebuild and publish again, e.g. v0.4.0"
+        required: false
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  release:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  goreleaser:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true' || github.event.inputs.tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ needs.release-please.outputs.tag_name || github.event.inputs.tag }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod

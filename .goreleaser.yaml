@@ -39,15 +39,9 @@ checksum:
   name_template: checksums.txt
   algorithm: sha256
 
+# Release notes are written by release-please from the commit history.
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
-      - "^ci:"
-      - "Merge pull request"
+  disable: true
 
 release:
   prerelease: auto
