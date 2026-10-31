@@ -27,58 +27,6 @@ var (
 	skipInstall  bool
 )
 
-// promptProjectName keeps asking until it gets a valid name. It takes the
-// shared reader so later prompts don't lose buffered input.
-func promptProjectName(in *bufio.Reader) (string, error) {
-	for {
-		fmt.Print("Project name: ")
-
-		line, err := in.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("reading project name: %w", err)
-		}
-
-		name := strings.TrimSpace(line)
-		if err := project.ValidateName(name); err != nil {
-			fmt.Println(err)
-			continue
-		}
-		return name, nil
-	}
-}
-
-// promptTemplate lists the templates and accepts either a number or a
-// name. Pressing enter picks the first one.
-func promptTemplate(in *bufio.Reader) (string, error) {
-	all := templates.All()
-
-	fmt.Println("Template:")
-	for i, t := range all {
-		fmt.Printf("  %d) %-8s %s\n", i+1, t.Key, t.Description)
-	}
-
-	for {
-		fmt.Printf("Choose [1-%d, default 1]: ", len(all))
-
-		line, err := in.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("reading template choice: %w", err)
-		}
-
-		choice := strings.TrimSpace(line)
-		if choice == "" {
-			return all[0].Key, nil
-		}
-		if n, err := strconv.Atoi(choice); err == nil && n >= 1 && n <= len(all) {
-			return all[n-1].Key, nil
-		}
-		if t, err := templates.Get(choice); err == nil {
-			return t.Key, nil
-		}
-		fmt.Println("Not a valid choice, try again.")
-	}
-}
-
 var newCmd = &cobra.Command{
 	Use:   "new [project-name]",
 	Short: "Create a new Dewlon project",
@@ -110,6 +58,7 @@ Examples:
 func runNew(cmd *cobra.Command, args []string) error {
 	printLogo()
 
+	ctx := cmd.Context()
 	interactive := isInteractive()
 	in := bufio.NewReader(os.Stdin)
 
@@ -124,7 +73,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			return errors.New("no project name given and stdin is not a terminal; pass the name as an argument")
 		}
 		var err error
-		if name, err = promptProjectName(in); err != nil {
+		if name, err = promptProjectName(ctx, in); err != nil {
 			return err
 		}
 	}
@@ -134,7 +83,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	chosen := templateName
 	if len(args) == 0 && interactive && !cmd.Flags().Changed("template") {
 		var err error
-		if chosen, err = promptTemplate(in); err != nil {
+		if chosen, err = promptTemplate(ctx, in); err != nil {
 			return err
 		}
 		fmt.Println()
@@ -163,7 +112,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	say("Creating %s from the %s template...", name, tpl.Key)
 
 	start := time.Now()
-	res, err := project.Create(cmd.Context(), name, tpl.Key, opts)
+	res, err := project.Create(ctx, name, tpl.Key, opts)
 	if err != nil {
 		return fmt.Errorf("creating project: %w", err)
 	}

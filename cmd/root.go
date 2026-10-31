@@ -58,6 +58,13 @@ Examples:
 func Execute() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
+	// Once the first signal has been handled, hand Ctrl+C back to the
+	// system. If cleanup ever hangs, pressing it again ends the program.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+
 	err := rootCmd.ExecuteContext(ctx)
 	stop()
 
